@@ -55,8 +55,7 @@ public class ModKnowledgeScanner {
     private static boolean scanned = false;
 
     private static final Set<String> STOPWORDS = Set.of(
-            "что", "как", "для", "это", "эту", "этот", "где", "все", "всё", "мне", "дай", "сделай", "найди",
-            "рая", "райя", "прайм", "raya", "the", "and", "for", "что", "или", "при", "про", "там", "тут");
+            "что", "как", "для", "это", "эту", "этот", "где", "все", "всё", "мне", "дай", "сделай", "найди", "рая", "райя", "прайм", "raya", "the", "and", "for", "или", "при", "про", "там", "тут");
 
     public static void scanAllInstalledMods() {
         synchronized (LOCK) {
