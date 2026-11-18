@@ -125,8 +125,11 @@ public class GeminiBrainService {
             IN_FLIGHT.remove(uuid);
             raya.restoreBaseEmotion();
             RayaPrimeMod.LOGGER.error("[RayaPrime] Не удалось собрать контекст запроса", t);
+            player.sendSystemMessage(Component.literal("§c[Райя-Прайм]§r Внутренняя ошибка подготовки запроса: " + t));
             return;
         }
+        RayaPrimeMod.LOGGER.info("[RayaPrime] Запрос от {} ({}): {}", player.getName().getString(),
+                voice ? "голос" : "текст", voice ? "<аудио>" : userText);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -252,6 +255,7 @@ public class GeminiBrainService {
                                       String userText, boolean voice, String apiKey) {
         try {
             if (raya.isRemoved()) return;
+            RayaPrimeMod.LOGGER.info("[RayaPrime] Ответ Gemini: {}", rawJson);
             JsonObject decision = parseLenient(rawJson);
             String reply = str(decision, "reply").trim();
             String heard = str(decision, "heard").trim();
@@ -280,6 +284,9 @@ public class GeminiBrainService {
                 default -> raya.restoreBaseEmotion();
             }
 
+            if (reply.isEmpty() && !voice) {
+                player.sendSystemMessage(Component.literal("§b[Райя-Прайм]§7 (Gemini вернул пустую реплику)"));
+            }
             if (!reply.isEmpty()) {
                 String prefix = raya.isCrimsonMode() ? "§4[Кровавая Райя-Прайм]§c " : "§b[Райя-Прайм]§f ";
                 if (voice && !heard.isEmpty()) {
