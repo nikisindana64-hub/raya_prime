@@ -167,6 +167,19 @@ public class RayaPrimeMod {
                                     GeminiBrainService.processTextRequestAsync(player, raya, StringArgumentType.getString(ctx, "prompt"));
                                     return 1;
                                 })))
+                .then(Commands.literal("status").executes(ctx -> {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    RayaPrimeEntity raya = findOwnedRaya(player);
+                    String keyState = RayaConfig.getEffectiveApiKey().isEmpty()
+                            ? "§cНЕ ЗАДАН§r" : "§aзадан§r (" + RayaConfig.getEffectiveApiKey().length() + " символов)";
+                    player.sendSystemMessage(Component.literal("§b[Райя-Прайм | Диагностика]§r\n"
+                            + "Ключ Gemini: " + keyState + "\n"
+                            + "Модель: " + RayaConfig.GEMINI_MODEL.get() + "\n"
+                            + "Твоя Райя рядом: " + (raya != null ? "§aда§r, режим " + raya.getActiveMode() : "§cнет§r") + "\n"
+                            + "Simple Voice Chat загружен: " + (com.mamarala.rayaprime.voice.RayaVoice.isVoiceChatLoaded() ? "да" : "нет") + "\n"
+                            + "Голосовое управление включено: " + (RayaConfig.VOICE_ACTIVATION_ENABLED.get() ? "да" : "нет")));
+                    return 1;
+                }))
                 .then(Commands.literal("mods").executes(ctx -> {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     player.sendSystemMessage(Component.literal("§b[Райя-Прайм | База П.Е.Р.С.И.К.]§r Загруженные моды: "
@@ -183,8 +196,12 @@ public class RayaPrimeMod {
         if (!WAKE.matcher(raw).find()) return;
         ServerPlayer player = event.getPlayer();
         RayaPrimeEntity raya = findOwnedRaya(player);
+        LOGGER.info("[RayaPrime] Обращение в чате от {}: {} (Райя найдена: {})", player.getName().getString(), raw, raya != null);
         if (raya != null) {
             GeminiBrainService.processTextRequestAsync(player, raya, raw);
+        } else {
+            player.sendSystemMessage(Component.literal(
+                    "§c[Райя-Прайм]§r Я не вижу твоей Райи рядом (или она ещё не твоя). Позови её: /raya summon"));
         }
     }
 
