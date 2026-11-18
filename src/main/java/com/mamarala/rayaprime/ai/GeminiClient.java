@@ -22,7 +22,8 @@ import java.util.List;
 public final class GeminiClient {
 
     private static final HttpClient HTTP = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
+            .connectTimeout(Duration.ofSeconds(15))
+            .version(HttpClient.Version.HTTP_1_1) // HTTP/2 через некоторые VPN/прокси зависает
             .build();
     private static final Gson GSON = new Gson();
     private static final String BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -72,7 +73,9 @@ public final class GeminiClient {
         String thinking = RayaConfig.GEMINI_THINKING_LEVEL.get().trim();
         StringBuilder errors = new StringBuilder();
         int lastStatus = 0;
+        int netFails = 0;
         for (String model : modelChain(RayaConfig.GEMINI_MODEL.get().trim(), RayaConfig.GEMINI_FALLBACK_MODELS.get())) {
+            if (netFails >= 2) break; // сеть недоступна — перебор моделей бессмыслен
             boolean useThinking = !thinking.isEmpty() && model.startsWith("gemini-3");
             boolean withThinking = useThinking;
             for (int attempt = 0; attempt < 3; attempt++) {
@@ -82,8 +85,18 @@ public final class GeminiClient {
                     tc.addProperty("thinkingLevel", thinking);
                     payload.getAsJsonObject("generationConfig").add("thinkingConfig", tc);
                 }
+                long t0 = System.currentTimeMillis();
                 try {
-                    return extractText(post(model, apiKey, payload, 40));
+                    String text = extractText(post(model, apiKey, payload, 60));
+                    RayaPrimeMod.LOGGER.info("[RayaPrime] Gemini ({}) ответил за {} мс", model, System.currentTimeMillis() - t0);
+                    return text;
+                } catch (java.io.IOException e) {
+                    // таймаут / нет соединения / обрыв — это сеть, а не модель
+                    netFails++;
+                    RayaPrimeMod.LOGGER.warn("[RayaPrime] Сеть: {} ({}) за {} мс", e.getClass().getSimpleName(), model, System.currentTimeMillis() - t0);
+                    errors.append("\n• ").append(model).append(": сеть — ").append(e.getClass().getSimpleName())
+                            .append(" (").append(e.getMessage()).append(')');
+                    break;
                 } catch (GeminiException e) {
                     lastStatus = e.status;
                     RayaPrimeMod.LOGGER.warn("[RayaPrime] {} (попытка {}, thinking={}): {}", model, attempt + 1, withThinking, e.getMessage());
