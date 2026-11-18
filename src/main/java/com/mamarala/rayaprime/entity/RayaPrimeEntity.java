@@ -141,9 +141,12 @@ public class RayaPrimeEntity extends PathfinderMob {
         return false; // Райя не должна исчезать, когда игрок далеко
     }
 
-    @Override
-    public boolean canBreatheUnderwater() {
-        return true;
+        @Override
+    public void baseTick() {
+        super.baseTick();
+        if (!this.level().isClientSide) {
+            this.setAirSupply(this.getMaxAirSupply()); // корпус герметичен: под водой не тонет
+        }
     }
 
     @Override
