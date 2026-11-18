@@ -141,7 +141,7 @@ public class GeminiBrainService {
             } catch (Throwable e) {
                 RayaPrimeMod.LOGGER.error("[RayaPrime] Ошибка обращения к Gemini API", e);
                 String msg = String.valueOf(e.getMessage());
-                if (msg.length() > 220) msg = msg.substring(0, 220) + "…";
+                if (msg.length() > 900) msg = msg.substring(0, 900) + "…";
                 final String shown = msg;
                 server.execute(() -> {
                     IN_FLIGHT.remove(uuid);
