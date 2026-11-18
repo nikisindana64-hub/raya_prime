@@ -70,12 +70,14 @@ public final class GeminiClient {
     /** Запрашивает у Gemini JSON-решение. При 404/400 (модель снята / нет параметра) пробует запасные модели. */
     public static String generateJson(String apiKey, JsonObject payloadTemplate) throws Exception {
         String thinking = RayaConfig.GEMINI_THINKING_LEVEL.get().trim();
-        GeminiException last = null;
+        StringBuilder errors = new StringBuilder();
+        int lastStatus = 0;
         for (String model : modelChain(RayaConfig.GEMINI_MODEL.get().trim(), RayaConfig.GEMINI_FALLBACK_MODELS.get())) {
             boolean useThinking = !thinking.isEmpty() && model.startsWith("gemini-3");
-            for (int attempt = 0; attempt < (useThinking ? 2 : 1); attempt++) {
+            boolean withThinking = useThinking;
+            for (int attempt = 0; attempt < 3; attempt++) {
                 JsonObject payload = payloadTemplate.deepCopy();
-                if (useThinking && attempt == 0) {
+                if (withThinking) {
                     JsonObject tc = new JsonObject();
                     tc.addProperty("thinkingLevel", thinking);
                     payload.getAsJsonObject("generationConfig").add("thinkingConfig", tc);
@@ -83,18 +85,28 @@ public final class GeminiClient {
                 try {
                     return extractText(post(model, apiKey, payload, 40));
                 } catch (GeminiException e) {
-                    last = e;
-                    if (useThinking && attempt == 0 && e.status == 400) {
-                        continue; // повтор без thinkingConfig
+                    lastStatus = e.status;
+                    RayaPrimeMod.LOGGER.warn("[RayaPrime] {} (попытка {}, thinking={}): {}", model, attempt + 1, withThinking, e.getMessage());
+                    if (e.status == 400 && withThinking) {
+                        withThinking = false; // возможно, модель не принимает thinkingConfig — повтор без него
+                        continue;
                     }
-                    break; // к следующей модели
+                    if ((e.status == 503 || e.status == 500 || e.status == 429) && attempt < 2) {
+                        Thread.sleep(1500L * (attempt + 1)); // перегрузка — подождать и повторить ту же модель
+                        continue;
+                    }
+                    String m = e.getMessage();
+                    if (m.length() > 170) m = m.substring(0, 170) + "…";
+                    errors.append("\n• ").append(m.replace('\n', ' '));
+                    break;
                 }
             }
-            if (last != null && last.status != 404 && last.status != 400 && last.status < 500) {
-                throw last; // 401/403/429 — смена модели не поможет
+            // 401/403 — проблема с ключом, менять модель бессмысленно
+            if (lastStatus == 401 || lastStatus == 403) {
+                break;
             }
         }
-        throw last != null ? last : new IllegalStateException("Нет доступных моделей Gemini");
+        throw new GeminiException(lastStatus, errors.length() == 0 ? "Нет доступных моделей Gemini" : errors.toString());
     }
 
     private static String extractText(JsonObject resp) {
